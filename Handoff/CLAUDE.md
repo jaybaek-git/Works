@@ -2,7 +2,7 @@
 
 이 파일은 이 폴더에서 일하는 Claude 가 맨 처음 읽는 안내서입니다.
 2026-11 에 개인 계정 Claude 와 진행한 작업을 회사 계정 (벤치 PC) 으로 넘기며 정리했습니다.
-기준 버전: **PA DPD Tester v0.2.3.152 · PA Bench Monitor v2.5.185 (Site2 v1.4.100)**
+기준 버전: **PA DPD Tester v0.2.3.153 · PA Bench Monitor v2.5.186 (Site2 v1.4.101)**
 
 ---
 
@@ -137,7 +137,7 @@ K · M · L 크기 (1 dB 이내) · 반복 횟수 · 신경망 크기 · 앞쪽 
 |---|---|
 | `*.json` (큐 폴더 바로 아래) | 대기 중 실험. **이름 순서** 로 실행 → 이름 앞에 번호 (`010_…`, `020_…`) |
 | `running\` · `done\` · `failed\` | 실행 중 · 성공 · 실패 (파일이 옮겨짐) |
-| `results.jsonl` | 단계마다 한 줄: time, file, note, step, do, status (ok · timeout · pout_cap · bias_off · error · skip · not_started), **D, B, T**, code, pout, sg, aclr_l/u, model, set (4 카드 값 전부) |
+| `results.jsonl` | 단계마다 한 줄: time, file, note, step, do, status (ok · timeout · pout_cap · bias_off · error · skip · not_started · fsw_fail · ext_selftest_fail), **D, B, T**, code, **diag (진단 요약 전문)**, pout, sg, aclr_l/u, model, ext_model, set (4 카드 값 전부), fsw_att, iq_avg, **run_id · run_file (측정 전체 데이터)** |
 | `status.json` | 지금 상태 (2 초마다): on, state (run · empty · wait_bias · retry_on), waiting, ok, fail, current, last |
 | `결과_요약.xlsx` | results.jsonl 정리: D 좋은 순 · 전체 시간 순 · 설정 |
 | `xlsx\<실험>_D-46.xlsx` | 실험마다 항상 (측정 표 · 바이어스 · 설정) |
@@ -168,10 +168,64 @@ K · M · L 크기 (1 dB 이내) · 반복 횟수 · 신경망 크기 · 앞쪽 
 - 시작: 사용자가 9 카드 [▶ 큐 시작] 을 누른 뒤, Claude Code 에 `WEEKEND_RUN.md` 내용을 붙여 넣음.
 - 보조 에이전트 정의: `.claude/agents/dpd-analyst.md` (결과 분석), `dpd-modeler.md` (새 모델 · 확장 모델 · 시뮬레이션 검증), `dpd-reporter.md` (보고서), `dpd-equipment.md` (장비 · FSW 상태 · 감쇠 최적 판단), `dpd-narrator.md` (해설: 지금 무엇을 · 왜 · 이전 기록 → `queue\narration.txt` (9 카드에 표시) · `queue\지금_상황.md`).
 - 실험이 바뀔 때마다 · 결정을 내릴 때마다 dpd-narrator 를 불러 설명을 갱신 (최소 30 분마다). 결정 이유는 `queue\plan.md` 에 짧게 남겨 해설자가 읽게.
-- 주기: 1 ~ 2 시간마다 `status.json` · `results.jsonl` 확인 → 큐에 대기 실험이 2 개 아래면 다음 묶음 작성.
+- **주기: 일이 생기면 바로.** `python tools\wait_event.py` 가 실험 · 단계가 끝나거나 큐 상태가 바뀌거나 대기 실험이 2 개 아래로 떨어질 때까지 (최대 9 분) 기다렸다가 무엇이 바뀌었는지 알려줌 → 판단 · 행동 → 다시 wait_event. 아무 일 없어도 9 분마다 한 번 깨어남.
 - 실험 설계 원칙: 한 번에 한 가지만 바꿈 · 같은 ILC (같은 Pout · 같은 날) 끼리 비교 · 좋은 설정은 이어서 반복으로 확인 · 같은 걸 3 번 넘게 반복하지 않음.
 - 새 모델 코드: `dpd_core.py` 에 추가 → **가짜 PA (numpy) 로 먼저 검증** → `python -m py_compile` → 버전 올림 (§2) → 프로그램은 **사용자가 다시 켜야** 새 코드가 들어감 (주말엔 큐 파일로 쓸 수 있는 기존 모델 · 설정 조합 위주로).
 - 프로그램 코드를 고치는 건 주말 무인 중엔 하지 말 것 (실행 중인 프로그램엔 안 들어가고 위험). 아이디어 · 패치는 `proposals\` 에 써 두고 월요일에 사용자 확인.
+
+### 8-6. 전략 사다리 (ILC → 신경망 → 기지국 알고리즘)
+1. **위 (상한) 올리기 — ILC**: ILC 조건 (반복 · 이득 · 대역 · 시간/주파수 · I/Q 평균 · FSW 감쇠 최적) 을 바꿔 ILC D 를 가장 좋게.
+   ILC 는 반복마다 측정하고 **가장 좋았던 반복의 입력 신호** 를 '최고' 로 남김 (자동 저장 · 다음 `ilcm` 이 이걸 씀). 가장 좋은 조건으로 한 번 더 뽑아 고정.
+2. **가운데 (모델이 배울 수 있는 한계) — torch 신경망**: 같은 ILC 로 신경망을 다양하게 (M · 은닉 · 학습 횟수 · 샘플 수 · 앞쪽 샘플 · ACLR 가중 · 나쁜 채널 자동, 필요하면 확장 모델로 새 구조) → ILC 에 얼마나 가까이 가는지.
+   차이 ① = ILC D − 신경망 D (모델로 못 가는 몫 — 측정 · 하드웨어 쪽).
+3. **아래 (실제로 쓸 것) — GMP · DVR · 확장 모델 (기지국용)**: 신경망 · ILC 를 따라가는 계수 선형 구조. 차이 ② = 신경망 D − GMP D (지금 6 dB, 인접 채널 어깨).
+   신경망이 쓰는 입력을 하나씩 빼 보거나 (분석), 신경망 출력 − GMP 출력 차이의 스펙트럼 · AM 구간을 보고 빠진 항의 꼴을 추정 → 확장 모델로.
+- 보고서마다 사다리 세 칸의 지금 값 (ILC · 신경망 · GMP 최고 D) 과 차이 ① ② 를 맨 위에.
+
+### 8-7. 분석 재료 (D · B 말고도)
+- `results.jsonl` 의 `diag` (진단 요약 전문: S 진폭 구간 오차 · N · Y · X · K 최고값 걸린 수 · 주파수별 학습 오차 4 칸 …)
+- `run_file` (= `%APPDATA%\PADPDTester\runs\<run_id>.json.gz`, `python tools\run_data.py <run_id>`): 측정마다 Pout · Pin · Gain · EVM · PAE · DE · ACLR L/U · 반송파별 인접 (aclr_pos) · PAPR · NMSE ·
+  **스펙트럼** (`spec_f/spec_db` = I/Q, `mod_f/mod_db` = FSW Mod. 화면) · **AM-AM / AM-PM 점** (`am_x/am_g/am_p`)
+- `queue\xlsx\` (실험마다 측정 표 · 바이어스) · `queue\shots\` (FSW 화면) · `logs\진단요약_날짜.txt`
+- 볼 것 예: L/U 비대칭 (메모리 · AM-PM) · 어깨 모양 (반송파별 IM3 vs 교차) · AM-AM 퍼짐 (메모리 깊이) · 진폭 구간별 오차 (S: 꺾임 · 피킹) ·
+  반복에 따른 수렴 · EVM · PAE 와의 맞바꿈 · 측정 조건 (감쇠 · I/Q 평균) 에 따른 바닥 변화 · 실험 사이 재현성 (같은 설정 반복 차이).
+
+### 8-4. 확장 모델 (Claude 가 직접 만드는 새 DPD 모델)
+- 위치: `%APPDATA%\PADPDTester\models_ext\<이름>.py` (이름 = 영문 · 숫자 · `_`). 9 카드 '확장 모델' 칸 옆 📂 로 열림. 예시: `models_ext\example_omp_xlag.py`.
+- 프로그램이 **실행할 때마다 파일을 새로 읽음** → 고친 내용이 다음 실험부터 바로 반영 (프로그램 재시작 필요 없음).
+- 파일 규칙:
+  - `make_model(p, eng, C)` → 모델 객체. `p` = 설정 dict (K · M · L · lam · omp_n · nn_aclr_w …), `C` = `dpd_core` 모듈 (기존 모델 클래스 상속 · 재사용), `eng` = 엔진 (`eng.sig.x/fs`, `eng.aclr_bands()`, `eng.aclr_band_w(배수)`, `eng.log(...)`).
+  - 모델: `fit(u, d, n_fit=40000, rng=None, **kw) -> (w, 학습 오차 dB)` · `apply(x, w=None) -> 같은 길이 복소 배열` (w=None 이면 학습한 self.w).
+    `_basis_seg(u, s0, n)` (계수 선형 모델) 이 있으면 ILC→모델 의 ACLR 가중 학습 · 진단이 자동으로 붙음 → **GMP 계열은 `C.DPDModel` · `C.SparseGMPModel` 을 상속하는 게 가장 쉬움**.
+  - `VERSION = "..."` (고칠 때마다 올림 · 결과 줄에 남음), `DESC = "한 줄 설명"`.
+  - 계산만: 장비 · 파일 · 네트워크 · 바이어스 접근 금지. 학습은 수 분 안 (자동 검사 제한 240 초).
+- 자동 검사 (실험 전, 장비 안 씀): 2CC 가짜 신호 + 가짜 PA 로 학습 · 적용 → 숫자 (NaN) · 출력 크기 (0.3 ~ 3 배) · 시간 확인. 실패하면 그 실험은 건너뜀.
+- 장비 쪽 안전 (Pout 상한 · 최고값 제한 · SG 최대 · 바이어스) 은 프로그램이 그대로 지킴.
+
+### 8-5. 측정 조건도 바꿔가며 찾기 (사람이 없으니 다 해 봐도 됨)
+- 바꿔 볼 수 있는 측정 · 학습 조건 (실험 파일 `set`):
+  - `iq_avg` (I/Q 평균, 2 ~ 32) · `aclr_src` (`fsw_end` = 반복 중 I/Q · 끝만 FSW 화면 / `fsw` = 매번 FSW 화면 / `iq` = I/Q 만 — 사람이 안 보니 `iq` 로 빠르게 해도 됨, 최종 확인만 `fsw_end`)
+  - `w_mode` (`time` 시간 영역 · `focus` 주파수 집중 · `aclr` 주파수 ACLR 채널) · `ilc_time` (ILC 를 시간 영역으로) · `ilc_iters` · `ilc_gain` · `ilc_band_mhz`
+  - `b_target` (목표 Pout, 상한 42/43 안) · `fsw_att_db` (최소 감쇠 이상) · `fsw_ref_dbm` · `ref_margin_db` (2 이상) · `file_half400`
+- **ILC 조건 찾기**: ILC 조건 (반복 · 이득 · 대역 · 시간/주파수 · I/Q 평균 · 감쇠) 을 바꿔 `ilc` 단계로 상한 D 를 비교 → 가장 좋은 조건으로 **ILC 를 다시 한 번** 뽑은 뒤 그다음 모델 실험 (`ilcm` 은 가장 최근 ILC 를 씀).
+- FSW 단계 (9 카드 'Claude FSW 명령 허용' 켜져 있을 때 · SG RF OFF 뒤에만):
+  - `"fsw_opt"` 또는 `{"fsw_opt": [10, 12, 14, 16]}` — 가장 좋은 DPD 파형 (마지막 DPD · ILC 결과) 을 보내며 감쇠마다 ACLR → 과입력 없이 가장 깨끗한 감쇠 (0.3 dB 안 평평하면 가운데) 를 2 카드에 넣음. 감쇠 목록 생략 = 최소 감쇠부터 2 dB 간격 6 개. DPD OFF 에선 PA 왜곡이 커서 차이가 안 보이니 DPD 결과가 있을 때 할 것.
+  - `"fsw_check"` — 감쇠 · 주파수 · Ref · 프리앰프 · 과입력 상태 · 오류 읽어 결과 줄에.
+  - `"fsw_reset"` — 사용자가 마지막으로 불러온 FSW 설정 (.dfl) 을 다시 보내고 프로그램 기억을 비움.
+  - `{"fsw": ["SENS:FREQ:CENT 3.6GHz", "INP:ATT?"]}` — SCPI 명령 (? 는 읽어서 로그). 막음: 프리앰프 ON · 최소 감쇠 아래 · SHUT · MMEM:DEL 등. 끝나면 감쇠가 최소 아래면 자동으로 올림.
+  - `"fsw_shot"` — 지금 FSW 화면 저장 (shots\).
+- 장비 담당 에이전트 `dpd-equipment` 가 이 판단을 맡음.
+
+### 8-3. 보고서 (폴더 4 개 · `queue\보고서\`)
+| 폴더 | 언제 | 내용 |
+|---|---|---|
+| `실험별\` | 실험 하나 끝날 때마다 | `<시각>_<실험>.md` — 무엇을 · 왜 · 결과 (D · B · 스펙트럼 · AM-AM 특징) · 판정 한 줄 · 다음 |
+| `알고리즘별\` | 그 알고리즘 실험이 끝날 때마다 갱신 | `<ILC · 신경망 · GMP · OMP · DVR · 확장모델이름>.md` — 해 본 설정 · 결과 표 · 최고 · 배운 것 · 남은 것 (누적) |
+| `일일\` | 매일 밤 (자정 전) | `<날짜>.md` (+ xlsx) — 그날 한 일 · 결과 · 상위 3 (FSW 사진) · 안전 이벤트 · 내일 계획 |
+| `주간\` | 일요일 밤 (월요일 아침 보기용) | `<금~일 날짜>.md` (+ xlsx · 가능하면 pptx) — 한 줄 결론 · 금 · 토 · 일 각각 한 일 · 상위 3 · 알고리즘별 요약 · 사다리 (§8-6) 의 지금 위치 · **사용자에게 드릴 다음 선택지 2 ~ 3 개** |
+
+- 주말 동안의 '다음 선택지' 는 **지휘가 스스로 골라서 바로 실험** (가장 기대값 높은 것부터). 주간 보고서의 선택지만 사용자 몫.
+- `queue\shots\` 의 FSW 사진 (상위 3) 을 일일 · 주간 보고서에 넣음.
 
 ### 8-4. 확장 모델 (Claude 가 직접 만드는 새 DPD 모델)
 - 위치: `%APPDATA%\PADPDTester\models_ext\<이름>.py` (이름 = 영문 · 숫자 · `_`). 9 카드 '확장 모델' 칸 옆 📂 로 열림. 예시: `models_ext\example_omp_xlag.py`.

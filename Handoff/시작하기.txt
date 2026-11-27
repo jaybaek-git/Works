@@ -1,0 +1,26 @@
+DPD 주말 자동 실험 - 시작하기 (사람용)
+
+1) 이 폴더를 벤치 PC 아무 곳에 풉니다 (예 C:\DPD-Claude).
+2) Bench v2.5.187 (src\PA-Bench-Monitor 또는 GitHub zip) 를 run_without_build.bat 로 실행 → 장비 연결 → 바이어스 ON.
+3) DPD 탭 9 카드: Pout 상한 (42/43) 확인 → [▶ 큐 시작].
+4) VS Code 로 이 폴더 열기 (파일 → 폴더 열기 → C:\DPD-Claude) → Claude Code 패널 (오른쪽 위 ✳ 불꽃 아이콘) →
+   WEEKEND_RUN.md 내용을 그대로 붙여 넣기. (VS Code 설치 · 설정은 아래 '부록')
+   (Claude 가 queue_examples 의 실험 · models_ext 의 예시를 %APPDATA%\PADPDTester 아래로 복사해서 시작합니다)
+5) 퇴근 전 확인 (5 분):
+   - 9 카드 상태가 '진행 중' · 'Claude 설명' 칸에 글이 뜨는지
+   - %APPDATA%\PADPDTester\queue\results.jsonl 에 줄이 생기는지
+6) 벤치 PC 절전 끄기 · Claude Code 창 열어 두기.
+7) 월요일: %APPDATA%\PADPDTester\queue\보고서\ 의 최신 보고서 → 결과_요약.xlsx → shots\ (상위 3 FSW 화면).
+   멈추고 싶으면 queue 폴더에 STOP 이라는 빈 파일을 만들거나 9 카드 [⏸].
+
+부록) VS Code + Claude Code 설치 · 설정 (처음 한 번)
+ a. VS Code 1.94 이상 설치.
+ b. Ctrl+Shift+X → "Claude Code" 검색 (게시자 Anthropic) → Install. 안 보이면 VS Code 다시 시작.
+ c. 파일 → 폴더 열기 → 이 폴더 (C:\DPD-Claude). 아무 파일 (CLAUDE.md) 을 열면 오른쪽 위에 불꽃 아이콘 → 클릭.
+ d. 처음 열 때 회사 계정 (Enterprise) 으로 로그인.
+ e. 권한 모드 (입력칸 아래 표시): 주말 무인 실행은 확인 창이 뜨면 멈춤 →
+    'Auto' (자동 검토) 또는 'Accept edits' 로. 기본값으로 두려면 설정 (Ctrl+,) → "claudeCode.initialPermissionMode" → acceptEdits.
+    이 폴더의 .claude\settings.json 이 python 실행 · %APPDATA%\PADPDTester 쓰기를 허용하고 psu_panel.py 수정은 막아 둠.
+    그래도 확인 창이 뜨면 '항상 허용' 을 골라 두고 퇴근 전에 한 번 끝까지 도는지 확인.
+ f. 첫 메시지 전에: "CLAUDE.md 읽고 요약해 줘" 로 폴더를 제대로 읽는지 확인 → 그다음 WEEKEND_RUN.md 붙여 넣기.
+ g. 퇴근 전: 벤치 PC 절전 · 화면 잠금으로 꺼지지 않게, VS Code 창 닫지 않기.

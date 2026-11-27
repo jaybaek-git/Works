@@ -2,7 +2,7 @@
 
 이 파일은 이 폴더에서 일하는 Claude 가 맨 처음 읽는 안내서입니다.
 2026-11 에 개인 계정 Claude 와 진행한 작업을 회사 계정 (벤치 PC) 으로 넘기며 정리했습니다.
-기준 버전: **PA DPD Tester v0.2.3.151 · PA Bench Monitor v2.5.184 (Site2 v1.4.99)**
+기준 버전: **PA DPD Tester v0.2.3.152 · PA Bench Monitor v2.5.185 (Site2 v1.4.100)**
 
 ---
 
@@ -55,6 +55,11 @@ ACLR 을 최대한 낮추는 것. 신경망 (torch) 은 기지국에서 못 쓰�
 - 신호: **400 MHz 2CC**, 반송파 ±133 MHz × 100 MHz, **983.04 MSps**. (1CC 100 MHz NR 도 씀)
 - 측정 설정: FSW I/Q 평균 12, RBW 50 kHz. 반송파 사이 바닥 ≈ −100 dBm vs 반송파 −34 dBm (≈ −66 dBc) → 측정 바닥은 문제 아님.
 - 샘플 종류 4 가지 (Bench ① 샘플 종류) · 종류마다 바이어스 · 트리거 · 4 카드 값 등을 따로 기억.
+- **샘플별 FSW 설정 (사용자 값 · 2 카드)**: 3B0 = Ref −3 dBm · Ref 여유 3 dB · 감쇠 10 dB / 3X0 = Ref −5 dBm · Ref 여유 3 dB · 감쇠 7 dB.
+  감쇠는 이 값 아래로 내리지 말 것 (FSW 입력 보호 · 9 카드 'FSW 최소 감쇠' 가 막음).
+- **신호는 고정**: 400 MHz 2CC DPD 만, 사용자의 신호 파일 (.wv) 로만 시험. 신호 · 주파수 · 손실 · 장비 주소는 자동 실험이 못 바꿈 (잠김).
+  예외: 1 신호 '1000 MSps 넘으면 절반으로' (`file_half400`) 는 바꿔 볼 수 있음 — 기본 켬 (983.04 MSps). 결과가 잘 나오면 끄고 (1966.08 MSps) 다시 찾아볼 것.
+  끄면 신호가 바뀌므로 **ILC 부터 다시** (이전 결과와 직접 비교 X).
 
 ## 4. 코드 지도
 
@@ -161,7 +166,7 @@ K · M · L 크기 (1 dB 이내) · 반복 횟수 · 신경망 크기 · 앞쪽 
 
 ### 8-2. Claude 쪽 (지휘 · 보조 에이전트)
 - 시작: 사용자가 9 카드 [▶ 큐 시작] 을 누른 뒤, Claude Code 에 `WEEKEND_RUN.md` 내용을 붙여 넣음.
-- 보조 에이전트 정의: `.claude/agents/dpd-analyst.md` (결과 분석), `dpd-modeler.md` (새 모델 · 확장 모델 · 시뮬레이션 검증), `dpd-reporter.md` (보고서), `dpd-narrator.md` (해설: 지금 무엇을 · 왜 · 이전 기록 → `queue\narration.txt` (9 카드에 표시) · `queue\지금_상황.md`).
+- 보조 에이전트 정의: `.claude/agents/dpd-analyst.md` (결과 분석), `dpd-modeler.md` (새 모델 · 확장 모델 · 시뮬레이션 검증), `dpd-reporter.md` (보고서), `dpd-equipment.md` (장비 · FSW 상태 · 감쇠 최적 판단), `dpd-narrator.md` (해설: 지금 무엇을 · 왜 · 이전 기록 → `queue\narration.txt` (9 카드에 표시) · `queue\지금_상황.md`).
 - 실험이 바뀔 때마다 · 결정을 내릴 때마다 dpd-narrator 를 불러 설명을 갱신 (최소 30 분마다). 결정 이유는 `queue\plan.md` 에 짧게 남겨 해설자가 읽게.
 - 주기: 1 ~ 2 시간마다 `status.json` · `results.jsonl` 확인 → 큐에 대기 실험이 2 개 아래면 다음 묶음 작성.
 - 실험 설계 원칙: 한 번에 한 가지만 바꿈 · 같은 ILC (같은 Pout · 같은 날) 끼리 비교 · 좋은 설정은 이어서 반복으로 확인 · 같은 걸 3 번 넘게 반복하지 않음.
@@ -179,6 +184,20 @@ K · M · L 크기 (1 dB 이내) · 반복 횟수 · 신경망 크기 · 앞쪽 
   - 계산만: 장비 · 파일 · 네트워크 · 바이어스 접근 금지. 학습은 수 분 안 (자동 검사 제한 240 초).
 - 자동 검사 (실험 전, 장비 안 씀): 2CC 가짜 신호 + 가짜 PA 로 학습 · 적용 → 숫자 (NaN) · 출력 크기 (0.3 ~ 3 배) · 시간 확인. 실패하면 그 실험은 건너뜀.
 - 장비 쪽 안전 (Pout 상한 · 최고값 제한 · SG 최대 · 바이어스) 은 프로그램이 그대로 지킴.
+
+### 8-5. 측정 조건도 바꿔가며 찾기 (사람이 없으니 다 해 봐도 됨)
+- 바꿔 볼 수 있는 측정 · 학습 조건 (실험 파일 `set`):
+  - `iq_avg` (I/Q 평균, 2 ~ 32) · `aclr_src` (`fsw_end` = 반복 중 I/Q · 끝만 FSW 화면 / `fsw` = 매번 FSW 화면 / `iq` = I/Q 만 — 사람이 안 보니 `iq` 로 빠르게 해도 됨, 최종 확인만 `fsw_end`)
+  - `w_mode` (`time` 시간 영역 · `focus` 주파수 집중 · `aclr` 주파수 ACLR 채널) · `ilc_time` (ILC 를 시간 영역으로) · `ilc_iters` · `ilc_gain` · `ilc_band_mhz`
+  - `b_target` (목표 Pout, 상한 42/43 안) · `fsw_att_db` (최소 감쇠 이상) · `fsw_ref_dbm` · `ref_margin_db` (2 이상) · `file_half400`
+- **ILC 조건 찾기**: ILC 조건 (반복 · 이득 · 대역 · 시간/주파수 · I/Q 평균 · 감쇠) 을 바꿔 `ilc` 단계로 상한 D 를 비교 → 가장 좋은 조건으로 **ILC 를 다시 한 번** 뽑은 뒤 그다음 모델 실험 (`ilcm` 은 가장 최근 ILC 를 씀).
+- FSW 단계 (9 카드 'Claude FSW 명령 허용' 켜져 있을 때 · SG RF OFF 뒤에만):
+  - `"fsw_opt"` 또는 `{"fsw_opt": [10, 12, 14, 16]}` — 가장 좋은 DPD 파형 (마지막 DPD · ILC 결과) 을 보내며 감쇠마다 ACLR → 과입력 없이 가장 깨끗한 감쇠 (0.3 dB 안 평평하면 가운데) 를 2 카드에 넣음. 감쇠 목록 생략 = 최소 감쇠부터 2 dB 간격 6 개. DPD OFF 에선 PA 왜곡이 커서 차이가 안 보이니 DPD 결과가 있을 때 할 것.
+  - `"fsw_check"` — 감쇠 · 주파수 · Ref · 프리앰프 · 과입력 상태 · 오류 읽어 결과 줄에.
+  - `"fsw_reset"` — 사용자가 마지막으로 불러온 FSW 설정 (.dfl) 을 다시 보내고 프로그램 기억을 비움.
+  - `{"fsw": ["SENS:FREQ:CENT 3.6GHz", "INP:ATT?"]}` — SCPI 명령 (? 는 읽어서 로그). 막음: 프리앰프 ON · 최소 감쇠 아래 · SHUT · MMEM:DEL 등. 끝나면 감쇠가 최소 아래면 자동으로 올림.
+  - `"fsw_shot"` — 지금 FSW 화면 저장 (shots\).
+- 장비 담당 에이전트 `dpd-equipment` 가 이 판단을 맡음.
 
 ### 8-3. 월요일 아침에 보여줄 것 (dpd-reporter)
 `queue\보고서\주말_DPD_결과_YYYYMMDD.md` + 같은 내용 `.xlsx` (그리고 가능하면 `.pptx`):

@@ -2,7 +2,7 @@
 
 이 파일은 이 폴더에서 일하는 Claude 가 맨 처음 읽는 안내서입니다.
 2026-11 에 개인 계정 Claude 와 진행한 작업을 회사 계정 (벤치 PC) 으로 넘기며 정리했습니다.
-기준 버전: **PA DPD Tester v0.2.3.150 · PA Bench Monitor v2.5.183 (Site2 v1.4.98)**
+기준 버전: **PA DPD Tester v0.2.3.151 · PA Bench Monitor v2.5.184 (Site2 v1.4.99)**
 
 ---
 
@@ -125,7 +125,7 @@ K · M · L 크기 (1 dB 이내) · 반복 횟수 · 신경망 크기 · 앞쪽 
 
 ## 8. 자동 실험 · 오케스트레이션 (주말 무인 운전)
 
-### 8-1. 프로그램 쪽 (DPD 탭 9 카드 '자동 실험 (큐)', v0.2.3.150 ~)
+### 8-1. 프로그램 쪽 (DPD 탭 9 카드 '자동 실험 (큐)', v0.2.3.150 ~ · 확장 모델 v0.2.3.151 ~)
 큐 폴더: `%APPDATA%\PADPDTester\queue\`  (Windows: `C:\Users\<사용자>\AppData\Roaming\PADPDTester\queue`)
 
 | 파일 · 폴더 | 뜻 |
@@ -156,14 +156,29 @@ K · M · L 크기 (1 dB 이내) · 반복 횟수 · 신경망 크기 · 앞쪽 
 - 바이어스가 꺼지면 (Bench 의 이상 처리 등): SG RF OFF → 기다림 (기본 10 분) → **기존 POWER SUPPLY ON 순서** 로 다시 켬 (값 안 바꿈) → Idq (목표 CA+DRV ±15 %) 확인 → 그 실험을 처음부터. 벗어나거나 3 번 실패 → 바이어스 OFF 유지 · 큐 끝.
 - 큐가 비면 SG RF OFF 로 기다림 → 새 파일이 들어오면 바로 이어감 · 빈 채로 3 시간 = 큐 끝 (RF OFF · 바이어스 OFF 선택).
 - 자동 실험 중 프로그램의 확인 창은 뜨지 않고 로그에 남김 ('아니요' 로 진행).
+- `set` 에 `"ext_model": "<이름>"` 을 넣으면 4 카드 모델 대신 **확장 모델** (§8-4) 을 씀. 안 넣으면 4 카드 모델.
+  결과 줄에 `ext_model` · `ext_ver` · `ext_test` (자동 검사 결과) 가 같이 남음. 자동 검사 실패 = status `ext_selftest_fail` (장비 안 씀).
 
 ### 8-2. Claude 쪽 (지휘 · 보조 에이전트)
 - 시작: 사용자가 9 카드 [▶ 큐 시작] 을 누른 뒤, Claude Code 에 `WEEKEND_RUN.md` 내용을 붙여 넣음.
-- 보조 에이전트 정의: `.claude/agents/dpd-analyst.md` (결과 분석), `dpd-modeler.md` (새 모델 · 시뮬레이션 검증), `dpd-reporter.md` (보고서).
+- 보조 에이전트 정의: `.claude/agents/dpd-analyst.md` (결과 분석), `dpd-modeler.md` (새 모델 · 확장 모델 · 시뮬레이션 검증), `dpd-reporter.md` (보고서), `dpd-narrator.md` (해설: 지금 무엇을 · 왜 · 이전 기록 → `queue\narration.txt` (9 카드에 표시) · `queue\지금_상황.md`).
+- 실험이 바뀔 때마다 · 결정을 내릴 때마다 dpd-narrator 를 불러 설명을 갱신 (최소 30 분마다). 결정 이유는 `queue\plan.md` 에 짧게 남겨 해설자가 읽게.
 - 주기: 1 ~ 2 시간마다 `status.json` · `results.jsonl` 확인 → 큐에 대기 실험이 2 개 아래면 다음 묶음 작성.
 - 실험 설계 원칙: 한 번에 한 가지만 바꿈 · 같은 ILC (같은 Pout · 같은 날) 끼리 비교 · 좋은 설정은 이어서 반복으로 확인 · 같은 걸 3 번 넘게 반복하지 않음.
 - 새 모델 코드: `dpd_core.py` 에 추가 → **가짜 PA (numpy) 로 먼저 검증** → `python -m py_compile` → 버전 올림 (§2) → 프로그램은 **사용자가 다시 켜야** 새 코드가 들어감 (주말엔 큐 파일로 쓸 수 있는 기존 모델 · 설정 조합 위주로).
 - 프로그램 코드를 고치는 건 주말 무인 중엔 하지 말 것 (실행 중인 프로그램엔 안 들어가고 위험). 아이디어 · 패치는 `proposals\` 에 써 두고 월요일에 사용자 확인.
+
+### 8-4. 확장 모델 (Claude 가 직접 만드는 새 DPD 모델)
+- 위치: `%APPDATA%\PADPDTester\models_ext\<이름>.py` (이름 = 영문 · 숫자 · `_`). 9 카드 '확장 모델' 칸 옆 📂 로 열림. 예시: `models_ext\example_omp_xlag.py`.
+- 프로그램이 **실행할 때마다 파일을 새로 읽음** → 고친 내용이 다음 실험부터 바로 반영 (프로그램 재시작 필요 없음).
+- 파일 규칙:
+  - `make_model(p, eng, C)` → 모델 객체. `p` = 설정 dict (K · M · L · lam · omp_n · nn_aclr_w …), `C` = `dpd_core` 모듈 (기존 모델 클래스 상속 · 재사용), `eng` = 엔진 (`eng.sig.x/fs`, `eng.aclr_bands()`, `eng.aclr_band_w(배수)`, `eng.log(...)`).
+  - 모델: `fit(u, d, n_fit=40000, rng=None, **kw) -> (w, 학습 오차 dB)` · `apply(x, w=None) -> 같은 길이 복소 배열` (w=None 이면 학습한 self.w).
+    `_basis_seg(u, s0, n)` (계수 선형 모델) 이 있으면 ILC→모델 의 ACLR 가중 학습 · 진단이 자동으로 붙음 → **GMP 계열은 `C.DPDModel` · `C.SparseGMPModel` 을 상속하는 게 가장 쉬움**.
+  - `VERSION = "..."` (고칠 때마다 올림 · 결과 줄에 남음), `DESC = "한 줄 설명"`.
+  - 계산만: 장비 · 파일 · 네트워크 · 바이어스 접근 금지. 학습은 수 분 안 (자동 검사 제한 240 초).
+- 자동 검사 (실험 전, 장비 안 씀): 2CC 가짜 신호 + 가짜 PA 로 학습 · 적용 → 숫자 (NaN) · 출력 크기 (0.3 ~ 3 배) · 시간 확인. 실패하면 그 실험은 건너뜀.
+- 장비 쪽 안전 (Pout 상한 · 최고값 제한 · SG 최대 · 바이어스) 은 프로그램이 그대로 지킴.
 
 ### 8-3. 월요일 아침에 보여줄 것 (dpd-reporter)
 `queue\보고서\주말_DPD_결과_YYYYMMDD.md` + 같은 내용 `.xlsx` (그리고 가능하면 `.pptx`):

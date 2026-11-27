@@ -24,6 +24,7 @@
   4. 실험이 바뀌거나 결정을 내릴 때마다 dpd-narrator 로 queue\narration.txt · 지금_상황.md 갱신 — 결정 이유는 queue\plan.md 에 짧게.
   5. dpd-reporter: 실험 끝날 때마다 실험별 · 알고리즘별, 매일 밤 일일, 일요일 밤 주간 보고서 (CLAUDE.md §8-3).
      주말 동안 '다음 선택지' 는 네가 스스로 골라 바로 실험해 (전략 §8-6: ILC 는 지표 · 학습은 길 A 직접 학습 스윕 · 길 B ILC 정답 · 길 C 새 방법 · 이어서 ILC · 신경망 기준선은 네 판단).
+  5-0. dpd-signal-keeper: 알고리즘별 최고 신호 보관함 (§8-8) 확인 · 새 최고는 재현 확인 실험 제안 · 주간 보고서에 '월요일에 쏴 볼 신호' 3 개.
   5-1. FSW 이상 (과입력 · 튐 · 갑자기 나빠짐) 은 dpd-equipment 가 판단 (fsw_check → fsw_reset → 확인 → fsw_opt).
   6. status.json 의 state 가 wait_bias 오래 · fail 이 연속 3 번 · on=false 면 실험 추가를 멈추고 보고서에 이유를 써.
 - 일요일 밤 (자정 전) 에 큐 폴더에 STOP 파일을 만들어 마무리하고 최종 보고서를 완성해.

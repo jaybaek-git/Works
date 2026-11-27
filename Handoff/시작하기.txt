@@ -1,7 +1,7 @@
 DPD 주말 자동 실험 - 시작하기 (사람용)
 
 1) 이 폴더를 벤치 PC 아무 곳에 풉니다 (예 C:\DPD-Claude).
-2) Bench v2.5.187 (src\PA-Bench-Monitor 또는 GitHub zip) 를 run_without_build.bat 로 실행 → 장비 연결 → 바이어스 ON.
+2) Bench v2.5.188 (src\PA-Bench-Monitor 또는 GitHub zip) 를 run_without_build.bat 로 실행 → 장비 연결 → 바이어스 ON.
 3) DPD 탭 9 카드: Pout 상한 (42/43) 확인 → [▶ 큐 시작].
 4) VS Code 로 이 폴더 열기 (파일 → 폴더 열기 → C:\DPD-Claude) → Claude Code 패널 (오른쪽 위 ✳ 불꽃 아이콘) →
    WEEKEND_RUN.md 내용을 그대로 붙여 넣기. (VS Code 설치 · 설정은 아래 '부록')

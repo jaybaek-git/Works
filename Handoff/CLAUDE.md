@@ -2,7 +2,7 @@
 
 이 파일은 이 폴더에서 일하는 Claude 가 맨 처음 읽는 안내서입니다.
 2026-11 에 개인 계정 Claude 와 진행한 작업을 회사 계정 (벤치 PC) 으로 넘기며 정리했습니다.
-기준 버전: **PA DPD Tester v0.2.3.155 · PA Bench Monitor v2.5.188 (Site2 v1.4.103)**
+기준 버전: **PA DPD Tester v0.2.3.156 · PA Bench Monitor v2.5.189 (Site2 v1.4.104)**
 
 ---
 
@@ -171,7 +171,7 @@ K · M · L 크기 (1 dB 이내) · 반복 횟수 · 신경망 크기 · 앞쪽 
 - ILC · 학습 방식 키: `method` (`ila` 간접 · `dla` 직접), `w_mode` (`time` 시간 · `focus` 주파수·집중 · `aclr` 주파수·ACLR), `focus_mhz` `focus_w` `ilc_iters` `ilc_gain` `ilc_band_mhz` `ilc_time` `iq_avg` `fsw_att_db` (최소 감쇠 아래 막힘).
 - 안전: Pout 상한 42 / 43 dBm (3 카드 목표 Pout 도 상한으로 깎음 · 측정 Pout 이 상한 +0.3 넘으면 중지 · RF OFF) · 실험당 최대 시간 (기본 120 분, 파일 `max_min` 우선).
 - 바이어스가 꺼지면 (Bench 의 이상 처리 등): SG RF OFF → 기다림 (기본 10 분) → **기존 POWER SUPPLY ON 순서** 로 다시 켬 (값 안 바꿈) → Idq (목표 CA+DRV ±15 %) 확인 → 그 실험을 처음부터. 벗어나거나 3 번 실패 → 바이어스 OFF 유지 · 큐 끝.
-- 큐가 비면 SG RF OFF 로 기다림 → 새 파일이 들어오면 바로 이어감 · 빈 채로 3 시간 = 큐 끝 (RF OFF · 바이어스 OFF 선택).
+- 큐가 비면 SG RF OFF 로 기다림 → 새 파일이 들어오면 바로 이어감 · 빈 채로 9 카드 `큐가 빈 채로` 분 (기본 180 분, v0.2.3.156 ~ 분 단위) = 큐 끝 → 지휘는 대기 실험이 2 개 아래로 안 떨어지게 (RF OFF · 바이어스 OFF 선택).
 - 자동 실험 중 프로그램의 확인 창은 뜨지 않고 로그에 남김 ('아니요' 로 진행).
 - `set` 에 `"ext_model": "<이름>"` 을 넣으면 4 카드 모델 대신 **확장 모델** (§8-4) 을 씀. 안 넣으면 4 카드 모델.
   결과 줄에 `ext_model` · `ext_ver` · `ext_test` (자동 검사 결과) 가 같이 남음. 자동 검사 실패 = status `ext_selftest_fail` (장비 안 씀).
